@@ -23,8 +23,10 @@ MAP_PROMPT = """
 
 def main():
     if len(sys.argv) < 4:
-        raise Exception('Usage: python pdf_summarizer.py '
-                        '<input pdf file> <start_page> <end_page>  <output .md file>')
+        print('Usage: python pdf_summarizer.py '
+              '<input pdf file> <start_page> <end_page>  <output .md file>'
+              '\nExample: python3 pdf_summarizer.py /home/example-user/book.pdf 3 6 /home/example-user/out.md')
+        return
 
     filename = sys.argv[1]
     start_page = int(sys.argv[2])
