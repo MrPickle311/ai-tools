@@ -39,8 +39,7 @@ client = openai.OpenAI()
 def ask_chatgpt(messages):
     response = client.chat.completions.create(
         model="gpt-3.5-turbo",
-        messages=messages,
-        temperature=0
+        messages=messages
     )
     return response.choices[0].message.content
 
@@ -84,16 +83,21 @@ def get_cached_changes() -> Dict[str, FileChange]:
         if line.startswith("diff --git"):
             current_file = line.split(" ")[-1][2:]
             changes[current_file] = FileChange(current_file)
-        elif line.startswith("+++ ") or line.startswith("--- "):
-            pass
-        elif line.startswith("@@ "):
-            pass
-        elif line.startswith("+"):
-            if current_file:
-                changes[current_file].append_added_line(line[1:])
-        elif line.startswith("-"):
-            if current_file:
-                changes[current_file].append_deleted_line(line[1:])
+            continue
+
+        if line.startswith("+++ ") or line.startswith("--- "):
+            continue
+
+        if line.startswith("@@ "):
+            continue
+
+        if line.startswith("+") and current_file:
+            changes[current_file].append_added_line(line[1:])
+            continue
+
+        if line.startswith("-") and current_file:
+            changes[current_file].append_deleted_line(line[1:])
+            continue
 
     return changes
 
@@ -104,6 +108,7 @@ def generate_commit_messages():
     message = ''
 
     for file_path, file_changes in changes.items():
+        print(file_changes.to_string())
         file_changes.cleanup()
         message += file_changes.to_string()
 
