@@ -9,9 +9,39 @@ All requests return either a json object or dict with "error" and "code" values
 """
 
 
+class IdExtractor:
+    FIRST_HYPHEN_POSITION = 8
+    SECOND_HYPHEN_POSITION = FIRST_HYPHEN_POSITION + 4
+    THIRD_HYPHEN_POSITION = SECOND_HYPHEN_POSITION + 4
+    FOURTH_HYPHEN_POSITION = THIRD_HYPHEN_POSITION + 4
+    NOTION_PAGE_BASE_URL = 'https://www.notion.so'
+
+    def get_id_from_url(self, url: str) -> str:
+        if url.startswith(self.NOTION_PAGE_BASE_URL):
+            return self._extract_id_from_url(url)
+
+        return url
+
+    @staticmethod
+    def _add_hyphen_at(result: str, pos: int) -> str:
+        return result[:pos] + '-' + result[pos:]
+
+    def _extract_id_from_url(self, url: str) -> str:
+        result: str = url.split('/')[-1]
+        result: str = result.split('-')[-1]
+        hyphens_count = 0
+        result = self._add_hyphen_at(result, self.FIRST_HYPHEN_POSITION)
+        hyphens_count += 1
+        result = self._add_hyphen_at(result, self.SECOND_HYPHEN_POSITION + hyphens_count)
+        hyphens_count += 1
+        result = self._add_hyphen_at(result, self.THIRD_HYPHEN_POSITION + hyphens_count)
+        hyphens_count += 1
+        return self._add_hyphen_at(result, self.FOURTH_HYPHEN_POSITION + hyphens_count)
+
+
 class NotionClient:
     TEXT_BLOCK_TYPES = ["paragraph", "heading_1", "heading_2", "heading_3"]
-    BASE_NOTION_URL = "https://api.notion.com/v1"
+    BASE_NOTION_API_URL = "https://api.notion.com/v1"
 
     def __init__(self, notion_token):
         self.headers = {
@@ -20,13 +50,15 @@ class NotionClient:
             "Content-Type": "application/json"
         }
 
+        self.extractor = IdExtractor()
+
     def search_page(self, page_title: str = None):
         """
         Search for a page
         :param page_title: The page title
         :return: List of pages
         """
-        url = self.BASE_NOTION_URL + "/search"
+        url = self.BASE_NOTION_API_URL + "/search"
         body = {}
         if page_title is not None:
             body["query"] = page_title
@@ -35,7 +67,8 @@ class NotionClient:
         return self._response_or_error(response)
 
     def get_page(self, page_id: str):
-        url = self.BASE_NOTION_URL + f"/pages/{page_id}"
+        page_id = self.extractor.get_id_from_url(page_id)
+        url = self.BASE_NOTION_API_URL + f"/pages/{page_id}"
         response = requests.request("GET", url, headers=self.headers)
         return self._response_or_error(response)
 
@@ -45,6 +78,7 @@ class NotionClient:
         https://developers.notion.com/reference/get-block-children
         :return: Page dict
         """
+        page_id = self.extractor.get_id_from_url(page_id)
         return self.get_block_children(page_id)
 
     def get_block(self, block_id: str):
@@ -53,7 +87,8 @@ class NotionClient:
         https://developers.notion.com/reference/retrieve-a-block
         :return: Block dict
         """
-        url = self.BASE_NOTION_URL + f"/blocks/{block_id}"
+        block_id = self.extractor.get_id_from_url(block_id)
+        url = self.BASE_NOTION_API_URL + f"/blocks/{block_id}"
         response = requests.request("GET", url, headers=self.headers)
         return self._response_or_error(response)
 
@@ -64,7 +99,8 @@ class NotionClient:
         :return: List of children
         """
 
-        url = self.BASE_NOTION_URL + f"/blocks/{block_id}/children"
+        block_id = self.extractor.get_id_from_url(block_id)
+        url = self.BASE_NOTION_API_URL + f"/blocks/{block_id}/children"
         response = requests.request("GET", url, headers=self.headers)
         return self._response_or_error(response, "results")
 
@@ -74,7 +110,8 @@ class NotionClient:
         https://developers.notion.com/reference/update-a-block
         :return: Updated block
         """
-        url = self.BASE_NOTION_URL + f"/blocks/{block_id}"
+        block_id = self.extractor.get_id_from_url(block_id)
+        url = self.BASE_NOTION_API_URL + f"/blocks/{block_id}"
         response = requests.request("PATCH", url, headers=self.headers, json=content)
         return self._response_or_error(response)
 
@@ -86,7 +123,8 @@ class NotionClient:
         :param children: Array of blocks to be added
         :return: Appended blocks
         """
-        url = self.BASE_NOTION_URL + f"/blocks/{parent_id}/children"
+        parent_id = self.extractor.get_id_from_url(parent_id)
+        url = self.BASE_NOTION_API_URL + f"/blocks/{parent_id}/children"
         response = requests.request(
             "PATCH",
             url,
@@ -101,7 +139,8 @@ class NotionClient:
         https://developers.notion.com/reference/delete-a-block
         :return: Updated block
         """
-        url = self.BASE_NOTION_URL + f"/blocks/{block_id}"
+        block_id = self.extractor.get_id_from_url(block_id)
+        url = self.BASE_NOTION_API_URL + f"/blocks/{block_id}"
         response = requests.request("DELETE", url, headers=self.headers)
         return self._response_or_error(response)
 
@@ -113,6 +152,7 @@ class NotionClient:
         :return: The new block
         """
 
+        parent_id = self.extractor.get_id_from_url(parent_id)
         text_block = {
             "type": "paragraph",
             "paragraph": {
@@ -134,6 +174,7 @@ class NotionClient:
         :return: The new block
         """
 
+        parent_id = self.extractor.get_id_from_url(parent_id)
         text_block = {
             "type": "heading_2",
             "heading_2": {
@@ -155,10 +196,8 @@ class NotionClient:
         :return: The new block
         """
 
+        parent_id = self.extractor.get_id_from_url(parent_id)
         bullet_items = self._to_bullet_items(items)
-
-        print(bullet_items)
-
         for bullet_item in bullet_items:
             text_block = {
                 "type": "bulleted_list_item",
@@ -176,6 +215,7 @@ class NotionClient:
         :param new_text: New text set for the block
         :return: The new block
         """
+        block_id = self.extractor.get_id_from_url(block_id)
         block = self.get_block(block_id)
         block_type = block["type"]
 
@@ -206,6 +246,7 @@ class NotionClient:
         :param image_url: The image url
         :return: The parent block
         """
+        parent_id = self.extractor.get_id_from_url(parent_id)
         append_children = [
             {
                 "type": "image",
