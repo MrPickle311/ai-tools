@@ -23,19 +23,32 @@ class FileChange:
             DELETED LINES:\n {self.deleted}\n
             """
 
+    def cleanup(self):
+        added = self.added.splitlines()
+        deleted = self.deleted.splitlines()
+
+        for line in added:
+            if line in deleted:
+                self.added = self.added.replace(line, '')
+                self.deleted = self.deleted.replace(line, '')
+
 
 client = openai.OpenAI()
 
 
 def ask_chatgpt(messages):
     response = client.chat.completions.create(
-        model="gpt-3.5-turbo", messages=messages
+        model="gpt-3.5-turbo",
+        messages=messages,
+        temperature=0
     )
     return response.choices[0].message.content
 
 
 prompt_role = ("You are an commit message analyzer. \
-    Your task is to analyze commit diffs and write summary messages about it. \
+    Your task is to analyze commit diffs and write summary messages about commits changes. \
+    I want only commit changes. Nothing else \
+    Summary messages should describe only business changes.  \
     You should respect the instructions: the LENGTH, and the STYLE, COMMIT_CHANGES. \
     Clause FILE contains name of changed file, ADDED LINES contains lines which are added to file, \
     DELETED LINES contains list of lines which are deleted from file. \
@@ -91,6 +104,7 @@ def generate_commit_messages():
     message = ''
 
     for file_path, file_changes in changes.items():
+        file_changes.cleanup()
         message += file_changes.to_string()
 
     resp = generate_commit_message(50, 'BULLET POINT LIST OF CHANGES', message)
