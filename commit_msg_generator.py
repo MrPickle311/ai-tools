@@ -19,8 +19,8 @@ class FileChange:
     def to_string(self):
         return f"""\n
             FILE: {self.filename}
-            ADDED:\n {self.added}\n
-            DELETED: {self.deleted}\n
+            ADDED LINES:\n {self.added}\n
+            DELETED LINES:\n {self.deleted}\n
             """
 
 
@@ -37,9 +37,18 @@ def ask_chatgpt(messages):
 prompt_role = ("You are an commit message analyzer. \
     Your task is to analyze commit diffs and write summary messages about it. \
     You should respect the instructions: the LENGTH, and the STYLE, COMMIT_CHANGES. \
-    Clause FILE contains name of changed file, ADDED contains lines which are added to file, \
-    DELETED contains list of lines which are deleted from file. \
-    Summary messages should contain name of changed file in summary header")
+    Clause FILE contains name of changed file, ADDED LINES contains lines which are added to file, \
+    DELETED LINES contains list of lines which are deleted from file. \
+    Summary messages should contain name of changed file in summary header. \
+    I expect the following output format: \n\
+    Summary of file1: \n\
+    - change1 ... \n\
+    - change2 ... \n\
+    ... \n\
+    Summary of file2: \n\
+    - change1 ... \n\
+    - change2 ... \n\
+    ...")
 
 
 def generate_commit_message(length_characters: int, style: str, changes: str) -> str:
@@ -51,35 +60,25 @@ def generate_commit_message(length_characters: int, style: str, changes: str) ->
 
 
 def get_cached_changes() -> Dict[str, FileChange]:
-    # Wywołanie polecenia git diff --cached i pobranie wyniku
     diff_output = subprocess.check_output(["git", "diff", "--cached"]).decode("utf-8")
 
-    # Podzielenie wyniku na linie
     diff_lines = diff_output.split("\n")
 
-    # Inicjalizacja słownika do przechowywania zmian w plikach
     changes = {}
     current_file = None
 
-    # Analiza wyniku
     for line in diff_lines:
         if line.startswith("diff --git"):
-            # Znaleziono nowy plik, zapisujemy jego nazwę
             current_file = line.split(" ")[-1][2:]
             changes[current_file] = FileChange(current_file)
         elif line.startswith("+++ ") or line.startswith("--- "):
-            # Ignorujemy linie z nagłówkami pliku
             pass
         elif line.startswith("@@ "):
-            # Ignorujemy linie z informacjami o zmianach
-            # changes[current_file].append_modified_line(line)
             pass
         elif line.startswith("+"):
-            # Znaleziono dodany wiersz, dodajemy go do zmian w bieżącym pliku
             if current_file:
                 changes[current_file].append_added_line(line[1:])
         elif line.startswith("-"):
-            # Znaleziono usunięty wiersz, dodajemy go do zmian w bieżącym pliku
             if current_file:
                 changes[current_file].append_deleted_line(line[1:])
 
@@ -98,4 +97,5 @@ def generate_commit_messages():
     print(resp)
 
 
-generate_commit_messages()
+if __name__ == '__main__':
+    generate_commit_messages()
