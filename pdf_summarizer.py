@@ -1,8 +1,9 @@
 import os
 import sys
-from typing import List
+from typing import List, Tuple
 
 from langchain.chains.summarize import load_summarize_chain
+from langchain_core.documents import Document
 from langchain_core.prompts import PromptTemplate
 from langchain_openai import OpenAI
 from pyxtension.streams import stream
@@ -25,7 +26,7 @@ MAP_PROMPT = """
     """
 
 
-def get_summary_from_pdf(end_page, filename, llm, start_page):
+def get_summary_from_pdf(end_page, filename, llm, start_page, begin_paragraph, end_paragraph):
     map_prompt_template = create_prompt_template(MAP_PROMPT)
     combine_prompt_template = create_prompt_template(COMBINE_PROMPT)
     summary_chain = load_summarize_chain(llm=llm,
@@ -34,25 +35,42 @@ def get_summary_from_pdf(end_page, filename, llm, start_page):
                                          combine_prompt=combine_prompt_template,
                                          )
     pages = get_pages_from_pdf(filename, start_page, end_page)
+
+    pages = trim_content(begin_paragraph, end_paragraph, pages)
+
     output = summary_chain.run(pages)
     return output
+
+
+def trim_content(begin_paragraph: str, end_paragraph: str, pages: List[Document]) -> List[Document]:
+    if begin_paragraph:
+        idx = pages[0].page_content.find(begin_paragraph)
+        pages[0].page_content = pages[0].page_content[idx:]
+
+    if end_paragraph:
+        idx = pages[-1].page_content.find(end_paragraph)
+        pages[-1].page_content = pages[-1].page_content[idx:]
+
+    return pages
 
 
 def create_prompt_template(template: str) -> PromptTemplate:
     return PromptTemplate(template=template, input_variables=["text"])
 
 
-def extract_args():
+def extract_args() -> Tuple[int, str, str, int, str, str]:
     filename = sys.argv[1]
     start_page = int(sys.argv[2])
     end_page = int(sys.argv[3])
     output_dest = sys.argv[4]
-    return end_page, filename, output_dest, start_page
+    begin_paragraph = sys.argv[5] if len(sys.argv) == 6 else None
+    end_paragraph = sys.argv[6] if len(sys.argv) == 7 else None
+    return end_page, filename, output_dest, start_page, begin_paragraph, end_paragraph
 
 
 def print_usage():
     print('Usage: python pdf_summarizer.py '
-          '<input pdf file> <start_page> <end_page>  <output .md file>'
+          '<input_pdf_file> <start_page> <end_page> <output> <begin_paragraph> <end_paragraph>'
           '\nExample: python3 pdf_summarizer.py /home/example-user/book.pdf 3 6 /home/example-user/out.md')
 
 
@@ -84,15 +102,15 @@ def is_notion_page(output_filename: str) -> bool:
 
 
 def main():
-    if len(sys.argv) < 4:
+    if len(sys.argv) < 5:
         print_usage()
         return
 
-    end_page, filename, output_dest, start_page = extract_args()
+    end_page, filename, output_dest, start_page, begin_paragraph, end_paragraph = extract_args()
 
     llm = OpenAI()
 
-    summary = get_summary_from_pdf(end_page, filename, llm, start_page)
+    summary = get_summary_from_pdf(end_page, filename, llm, start_page, begin_paragraph, end_paragraph)
 
     if is_notion_page(output_dest):
         save_to_notion(text=summary, page=output_dest)
