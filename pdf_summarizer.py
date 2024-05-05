@@ -43,13 +43,23 @@ def get_summary_from_pdf(end_page, filename, llm, start_page, begin_paragraph, e
 
 
 def trim_content(begin_paragraph: str, end_paragraph: str, pages: List[Document]) -> List[Document]:
+    if len(pages) == 0:
+        return []
+
+    begin_idx = -1
+    end_idx = -1
+
     if begin_paragraph:
-        idx = pages[0].page_content.find(begin_paragraph)
-        pages[0].page_content = pages[0].page_content[idx:]
+        begin_idx = pages[0].page_content.find(begin_paragraph)
+
+    if begin_idx != -1:
+        pages[0].page_content = pages[0].page_content[begin_idx:]
 
     if end_paragraph:
-        idx = pages[-1].page_content.find(end_paragraph)
-        pages[-1].page_content = pages[-1].page_content[idx:]
+        end_idx = pages[-1].page_content.find(end_paragraph)
+
+    if end_idx != -1:
+        pages[-1].page_content = pages[-1].page_content[:end_idx]
 
     return pages
 
