@@ -42,6 +42,16 @@ def get_summary_from_pdf(end_page, filename, llm, start_page, begin_paragraph, e
     return output
 
 
+def notify_end_paragraph_not_found(pages):
+    print('End paragraph not found')
+    print(pages[-1].page_content)
+
+
+def notify_begin_paragraph_not_found(pages):
+    print('Begin paragraph not found')
+    print(pages[0].page_content)
+
+
 def trim_content(begin_paragraph: str, end_paragraph: str, pages: List[Document]) -> List[Document]:
     if len(pages) == 0:
         return []
@@ -52,13 +62,17 @@ def trim_content(begin_paragraph: str, end_paragraph: str, pages: List[Document]
     if begin_paragraph:
         begin_idx = pages[0].page_content.find(begin_paragraph)
 
-    if begin_idx != -1:
+    if begin_idx == -1:
+        notify_begin_paragraph_not_found(pages)
+    else:
         pages[0].page_content = pages[0].page_content[begin_idx:]
 
     if end_paragraph:
         end_idx = pages[-1].page_content.find(end_paragraph)
 
-    if end_idx != -1:
+    if end_idx == -1:
+        notify_end_paragraph_not_found(pages)
+    else:
         pages[-1].page_content = pages[-1].page_content[:end_idx]
 
     return pages
@@ -73,8 +87,8 @@ def extract_args() -> Tuple[int, str, str, int, str, str]:
     start_page = int(sys.argv[2])
     end_page = int(sys.argv[3])
     output_dest = sys.argv[4]
-    begin_paragraph = sys.argv[5] if len(sys.argv) == 6 else None
-    end_paragraph = sys.argv[6] if len(sys.argv) == 7 else None
+    begin_paragraph = sys.argv[5] if len(sys.argv) >= 6 else None
+    end_paragraph = sys.argv[6] if len(sys.argv) >= 7 else None
     return end_page, filename, output_dest, start_page, begin_paragraph, end_paragraph
 
 
